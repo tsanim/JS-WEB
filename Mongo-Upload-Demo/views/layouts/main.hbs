@@ -1,0 +1,13 @@
+<h1>Welcome</h1>
+
+    <form action="/upload" method="POST" enctype="multipart/form-data">
+        <input type="text" name="username" id="text">
+        <input type="file" name="avatar" id="file">
+        <input type="submit" value="Submit">
+    </form>
+    <div>
+    {{#each users}}
+    <h1>{{username}}</h1>
+    <img width="400" height="300" src="image/{{imageUrl}}" alt="">
+    {{/each}}
+</div>
