@@ -95,6 +95,7 @@ app.get('/images', (req, res) => {
     })
 })
 
+//path for getting image from the client
 app.get('/image/:imageId', (req, res) => {
     let id = new mongoose.mongo.ObjectID(req.params.imageId);
 
