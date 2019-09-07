@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-alpha.6/css/bootstrap.min.css">
+
+    <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js"
+        integrity="sha384-q8i/X+965DzO0rT7abK41JStQIAqVgRVzpbzo5smXKp4YfRvH+8abtTE1Pi6jizo" crossorigin="anonymous">
+    </script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.7/umd/popper.min.js"
+        integrity="sha384-UO2eT0CpHqdSJQ6hJty5KVphtPhzWj9WO1clHTMGa3JDZwrnQq4sF86dIHNDz0W1" crossorigin="anonymous">
+    </script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js"
+        integrity="sha384-JjSmVgyd0p3pXB1rRibZUAYoIIy6OrQ6VrjIEaFf/nJGzIxFDsf4x0xIM+B07jRM" crossorigin="anonymous">
+    </script>
+    <script src="/socket.io/socket.io.js"></script>
+    <title>CHAT</title>
+    <style>
+        #chatPage {
+            display: none;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="login col-12">
+            <form id="userForm">
+                <div class="form-group">
+                    <label for="username">Enter Your Username</label>
+                    <input id="username" class="form-control">
+                    <input type="submit" value="Login" class="btn btn-outline-primary">
+                </div>
+            </form>
+        </div>
+
+        <div id="chatPage" class="row">
+            <div class="col-4">
+                <div class="card bg-light">
+                    <h2>ONLINE USERS</h2>
+                    <ul id="users" class="list-group"></ul>
+                </div>
+            </div>
+
+            <div class="col-8">
+                <h2>CHAT</h2>
+                <div id="chat" class="chat"></div>
+                <form id="messageForm">
+                    <div class="form-group">
+                        <label for="message">Enter Message</label>
+                        <textarea id="message" class="form-control" rows="3"></textarea>
+                        <input type="submit" value="Send" class="btn btn-outline-primary">
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        $(function () {
+            const socket = io();
+
+            const colors = ['#bc11bf', '#7c6eba', '#4b6274', '#65c271', '#cafa9a', '#c6d2b1', '#c63d05',
+                '#1b37b1', '#64759f'
+            ]
+
+            const $messageForm = $('#messageForm');
+            const $messageInput = $('#message');
+
+            const $onlineUsers = $('#users');
+            const $userForm = $('.login');
+            const $usernameInput = $('#username');
+
+            const $chatPage = $('#chatPage');
+            const $chat = $('#chat');
+
+            $messageForm.submit((e) => {
+                e.preventDefault();
+
+                if ($messageInput.val() === '') return;
+
+                socket.emit('send message', $messageInput.val());
+                $messageInput.val('');
+            });
+            $userForm.submit((e) => {
+                e.preventDefault();
+
+                if ($usernameInput.val() === '') return;
+
+                socket.emit('new user', $usernameInput.val(), (data) => {
+                    if (data) {
+                        $userForm.hide();
+                        $chatPage.show();
+                    }
+                });
+
+                $messageInput.val('');
+            });
+
+            socket.on('new message', function ({
+                msg,
+                username
+            }) {
+                $('#chat').append('<div class="card card-body bg-light">' + '<span>' + `<strong style="color:${getUsernameColor(username)}">` +
+                    username + ' </strong>' + msg + '</span>' + '</div>');
+            });
+
+            socket.on('login', function (data) {
+                addWelcomeMessage(data);
+            })
+
+            socket.on('get users', function (data) {
+                let html = '';
+                $onlineUsers.html('');
+
+                for (let user of data) {
+                    html += '<li class="list-group">' + user + '</li>';
+                }
+
+                $onlineUsers.append(html);
+            });
+
+            socket.on('get typing', function (username) {
+                setTimeout(() => {
+                    $('#chat').append('<div ' + `data="${username}"` +
+                        'class="typing card card-body bg-light">' + '<span>' + `<strong style="color:${getUsernameColor(username)}">` + username +
+                        '</strong> is typing....</span></div>');
+                }, 1000);
+            });
+
+            socket.on('stop typing', (username) => {
+                setTimeout(() => {
+                    const $typingMsgs = $('.typing').filter(function (i) {
+                        return $(this).data('username') === username;
+                    }).prevObject;
+
+                    for (const div of $typingMsgs) {
+                        div.remove();
+                    }
+                }, 500)
+            });
+
+            $messageInput.focus((e) => {
+                socket.emit('typing')
+            });
+
+            $messageInput.blur((e) => {
+                socket.emit('stop typing')
+            });
+
+            function addWelcomeMessage(data) {
+                $('#chat').append('<div class="card card-body bg-light center"><strong>' +
+                    data.username +
+                    ' joined the room!</strong></div>');
+
+                let message = '';
+
+                if (data.participants === 1) {
+                    message = `There is ${data.participants}  participant!`;
+                } else {
+                    message = `There is ${data.participants}  participants!`;
+                }
+
+
+                $('#chat').append('<div class="card card-body bg-light center"><strong>' + message +
+                    '</strong></div>');
+            }
+
+            function getUsernameColor(username) {
+                // Compute hash code
+                var hash = 7;
+                for (var i = 0; i < username.length; i++) {
+                    hash = username.charCodeAt(i) + (hash << 5) - hash;
+                }
+                // Calculate color
+                var index = Math.abs(hash % colors.length);
+                return colors[index];
+            }
+        });
+    </script>
+</body>
+
+</html>
